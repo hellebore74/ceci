@@ -1,3 +1,28 @@
+Metadata-Version: 2.1
+Name: ceci
+Version: 2.0.2.dev17+g53f6d98.d20250122
+Summary: Lightweight pipeline engine for LSST DESC
+Home-page: https://github.com/LSSTDESC/ceci
+Author: Joe Zuntz
+License: BSD 3-Clause License
+Project-URL: homepage, https://github.com/LSSTDESC/ceci
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Description-Content-Type: text/markdown
+Provides-Extra: parsl
+Provides-Extra: cwl
+Provides-Extra: viz
+Provides-Extra: dask
+Provides-Extra: test
+Provides-Extra: all
+License-File: LICENSE
+
 ![Ceci Logo](ceci.png)
 
 
@@ -43,3 +68,5 @@ To make new pipeline stages, you must:
 - it must also have a file `__main__.py` with the same contents as the example in `ceci_example`.
 - each stage is its own class inheriting from `ceci.PipelineStage`. Each must define its name, inputs, and outputs, and a run method.
 - the run method should use the parent methods from `PipelineStage` to get its inputs and outputs etc.
+
+
