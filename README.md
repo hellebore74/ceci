@@ -17,6 +17,6 @@ A lightweight parsl-based framework for running DESC pipelines.
 
 This is now beta status.
 
-## This is a copy of teh official ceci package that is modified in order to launch pipelines defined by multiple documents yaml files
-## LAPP 2025
+## This is a copy of the official ceci package, the package is modified in order to launch pipelines defined by a multiple documents yaml file
+## SES - LAPP 2025
 
