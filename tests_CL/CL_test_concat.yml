@@ -1,5 +1,12 @@
 ---
 
+id: common
+
+toto: 1
+truc: machin
+
+---
+
 id: example1
 # Python modules that are imported to find
 # stage classes.  Any stages imported in these

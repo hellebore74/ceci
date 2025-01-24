@@ -437,18 +437,27 @@ class Pipeline:
         if not yamlId:
             pipe_config = yaml.safe_load(config_text)
         else:
+            import copy
             pipe_config = None
+            pipe_config_common = None
             pipe_config_gen = yaml.safe_load_all(config_text)
 
+            # Looping over yaml file to find yamlid section and common section
             for config in pipe_config_gen:
-                print(config)
+                if config and "id" in config and config["id"]=="common": 
+                    pipe_config_common = copy.deepcopy(config)
                 if config and "id" in config and config["id"]==yamlId: 
-                    pipe_config=config
-                    break
+                    pipe_config = copy.deepcopy(config)
             if not pipe_config:
-                print("No id found")
-                import sys
-                sys.exit()
+                raise ValueError(f"Could not find yaml section with id value set to {yamlId}")
+
+            # if a common id yaml section is found, both dictionaries are concatenated
+            #  CAUTION : common dict is overwriting yamlId dict
+            if pipe_config_common :
+                del pipe_config_common["id"]
+                pipe_config.update(pipe_config_common)
+
+            print("SES - final yaml config : ",pipe_config)
 
         if extra_config:
             override_config(pipe_config, extra_config)
