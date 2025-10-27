@@ -153,13 +153,13 @@ class PipelineStage:
         Subclasses must implemented this method.
         """
         raise NotImplementedError("run")
-    
+
     def validate(self):
         """Check that the inputs actually have the data needed for execution,
         This is called before the run method. It is an optional stage, meant
         for checking that the input to the stage is actual in the form and
         shape needed before an expensive run is executed."""
-        pass 
+        pass
 
     def load_configs(self, args):
         """
@@ -232,7 +232,7 @@ class PipelineStage:
 
         # We prefer to receive explicit filenames for the outputs but will
         # tolerate missing output filenames and will default to tag name in
-        # current folder (this is for CWL compliance)
+        # current folder.
         self._outputs = {}
         for i, x in enumerate(self.output_tags()):
             aliased_tag = self.get_aliased_tag(x)
@@ -356,11 +356,11 @@ class PipelineStage:
         if stage_is_complete and cls.config_options:
             config_text = cls._describe_configuration_text()
             if cls.__doc__ is None:
-                cls.__doc__ = f"Stage {cls.name}\n\nConfiguration Parameters:\n{config_text}"
+                cls.__doc__ = f"Stage {cls.name}\n\nParameters\n----------\n{config_text}"
             else:
                 # strip any existing configuration text from parent classes that is at the end of the doctring
-                cls.__doc__ = cls.__doc__.split("Configuration Parameters:")[0]
-                cls.__doc__ += f"\n\nConfiguration Parameters:\n{config_text}"
+                cls.__doc__ = cls.__doc__.split("Parameters")[0]
+                cls.__doc__ += f"\n\nParameters\n----------\n{config_text}"
 
         # Register the class
         if stage_is_complete:
@@ -436,24 +436,24 @@ class PipelineStage:
         s = []
         if cls.config_options is None:
             return "<This class has no configuration options>"
+
         for name, val in cls.config_options.items():
+            if isinstance(val, StageConfig):
+                val = val[name]
             if isinstance(val, StageParameter):
-                if val.required:
-                    if val.dtype is None:
-                        txt = f"[type not specified]: {val._help} (required)"
-                    else:
-                        txt = f"[{val.dtype.__name__}]: {val._help}  (required)"
-                else:
-                    if val.dtype is None:
-                        txt = f"[type not specified]: {val._help} (default={val.default})"
-                    else:
-                        txt = f"[{val.dtype.__name__}]: {val._help} (default={val.default})"
+                s.append(f"{name}: {val.numpy_style_help_text()}")
             elif isinstance(val, type):
-                txt = f"[{val.__name__}]: (required)"
+                s.append(f"{name}: {val.__name__}] (required)")
             else:
-                txt = f"[{type(val).__name__}]: (default={val})"
-            s.append(f"{name} {txt} ")
-        return '\n'.join(s)
+                s.append(f"{name}: {type(val).__name__}] (default={val})")
+
+        for input_ in cls.inputs:
+            s.append(f"{input_[0]}: {input_[1].__name__} (INPUT)")
+        for output_ in cls.outputs:
+            s.append(f"{output_[0]}: {output_[1].__name__} (OUTPUT)")
+
+        return '\n\n'.join(s)
+
 
     @classmethod
     def usage(cls):  # pragma: no cover
@@ -1600,149 +1600,6 @@ I currently know about these stages:
         # parsl job
         cmd = f"python3 -m {module} {flags}"
         return cmd
-
-    @classmethod
-    def generate_cwl(cls, log_dir=None):
-        """
-        Produces a CWL App object which can then be exported to yaml
-        """
-        import cwl_utils.parser.cwl_v1_0 as cwlgen
-
-        module = cls.get_module()
-        module = module.split(".")[0]
-
-        # Basic definition of the tool
-        cwl_tool = cwlgen.CommandLineTool(
-            [],
-            [],
-            id=cls.name,
-            label=cls.name,
-            baseCommand="python3",
-            cwlVersion="v1.0",
-            doc=cls.__doc__,
-            arguments=[],
-        )
-        if log_dir is not None:
-            cwl_tool.stdout = f"{cls.name}.out"
-            cwl_tool.stderr = f"{cls.name}.err"
-
-        # Adds the first input binding with the name of the module and pipeline stage
-        input_arg = cwlgen.CommandLineBinding(position=-1, valueFrom=f"-m{module}")
-        cwl_tool.arguments.append(input_arg)
-        input_arg = cwlgen.CommandLineBinding(position=0, valueFrom=f"{cls.name}")
-        cwl_tool.arguments.append(input_arg)
-
-        type_dict = {int: "int", float: "float", str: "string", bool: "boolean"}
-        # Adds the parameters of the tool
-        for opt, def_val in cls.config_options.items():
-
-            # Handles special case of lists:
-            if isinstance(def_val, list):
-                v = def_val[0]
-                param_type = {
-                    "type": "array",
-                    "items": type_dict[v]
-                    if isinstance(v, type)
-                    else type_dict[type(v)],
-                }
-                default = def_val if not isinstance(v, type) else None
-                input_binding = cwlgen.CommandLineBinding(
-                    prefix=f"--{opt}=", itemSeparator=",", separate=False
-                )
-            else:
-                param_type = (
-                    type_dict[def_val]
-                    if isinstance(def_val, type)
-                    else type_dict[type(def_val)]
-                )
-                default = def_val if not isinstance(def_val, type) else None
-                if param_type == "boolean":
-                    input_binding = cwlgen.CommandLineBinding(prefix=f"--{opt}")
-                else:  # pragma: no cover
-                    input_binding = cwlgen.CommandLineBinding(
-                        prefix=f"--{opt}=", separate=False
-                    )
-
-            input_param = cwlgen.CommandInputParameter(
-                opt,
-                label=opt,
-                type=param_type,
-                inputBinding=input_binding,
-                default=default,
-                doc="Some documentation about this parameter",
-            )
-
-            # We are bypassing the cwlgen builtin type check for the special case
-            # of arrays until that gets added to the standard
-            if isinstance(def_val, list):
-                input_param.type = param_type
-
-            cwl_tool.inputs.append(input_param)
-
-        # Add the inputs of the tool
-        for i, inp in enumerate(cls.input_tags()):
-            input_binding = cwlgen.CommandLineBinding(prefix=f"--{inp}")
-            input_param = cwlgen.CommandInputParameter(
-                inp,
-                label=inp,
-                type="File",
-                format=cls.inputs[i][1].format,  # pylint: disable=no-member
-                inputBinding=input_binding,
-                doc="Some documentation about the input",
-            )
-            cwl_tool.inputs.append(input_param)
-
-        # Adds the overall configuration file
-        input_binding = cwlgen.CommandLineBinding(prefix="--config")
-        input_param = cwlgen.CommandInputParameter(
-            "config",
-            label="config",
-            type="File",
-            format="http://edamontology.org/format_3750",
-            inputBinding=input_binding,
-            doc="Configuration file",
-        )
-        cwl_tool.inputs.append(input_param)
-
-        # Add the definition of the outputs
-        for i, out in enumerate(cls.output_tags()):
-            output_name = cls.outputs[i][1].make_name(out)  # pylint: disable=no-member
-            output_binding = cwlgen.CommandOutputBinding(glob=output_name)
-            output = cwlgen.CommandOutputParameter(
-                out,
-                label=out,
-                type="File",
-                outputBinding=output_binding,
-                format=cls.outputs[i][1].format,  # pylint: disable=no-member
-                doc="Some results produced by the pipeline element",
-            )
-            cwl_tool.outputs.append(output)
-
-        if log_dir is not None:
-            output = cwlgen.CommandOutputParameter(
-                f"{cls.name}@stdout",
-                label="stdout",
-                type="stdout",
-                doc="Pipeline elements standard output",
-            )
-            cwl_tool.outputs.append(output)
-            error = cwlgen.CommandOutputParameter(
-                f"{cls.name}@stderr",
-                label="stderr",
-                type="stderr",
-                doc="Pipeline elements standard output",
-            )
-            cwl_tool.outputs.append(error)
-
-        # Potentially add more metadata
-        # This requires a schema however...
-        # metadata = {'name': cls.name,
-        #         'about': 'Some additional info',
-        #         'publication': [{'id': 'one_doi'}, {'id': 'another_doi'}],
-        #         'license': ['MIT']}
-        # cwl_tool.metadata = cwlgen.Metadata(**metadata)
-
-        return cwl_tool
 
 
     def time_stamp(self, tag):

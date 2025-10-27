@@ -127,9 +127,6 @@ class NerscSite(Site):
 
         self.info["nodes"] = nodes
 
-    def configure_for_cwl(self):
-        """Utility function to set CWL configuration parameters"""
-
 
 class NerscBatchSite(NerscSite):
     """Object representing execution on the NERSC batch systems"""
@@ -152,7 +149,7 @@ class NerscBatchSite(NerscSite):
         walltime = self.config.get("walltime", "00:30:00")
         setup_script = self.config.get(
             "setup",
-            "/global/projecta/projectdirs/lsst/groups/WL/users/zuntz/setup-cori",
+            "/dev/null",
         )
 
         provider = SlurmProvider(

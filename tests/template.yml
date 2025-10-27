@@ -1,3 +1,9 @@
+{% if field == "" %}
+  {% set suffix = "" %}
+{% else %}
+  {% set suffix = "_" ~ field %}
+{% endif %}
+
 # Python modules that are imported to find
 # stage classes.  Any stages imported in these
 # modules are automatically detected and their names can
@@ -71,17 +77,16 @@ stages:
 # a previous stage must be defined here.  They are listed by tag.
 inputs:
     DM: ./tests/inputs/dm.txt
-    fiducial_cosmology: ./tests/inputs/fiducial_cosmology.txt
+    fiducial_cosmology: ./tests/{{ some_directory }}/fiducial_cosmology.txt
 
 # Overall configuration file 
-config: ./tests/config.yml
+config: {% if field == "north" %} ./tests/north.yml {% else %} ./tests/south.yml {% endif %}
 
 # If all the outputs for a stage already exist then do not re-run that stage
 resume: False
 
 # Put all the output files in this directory:
-output_dir: ./tests/outputs
+output_dir: ./tests/outputs{{ suffix }}
 
 # Put the logs from the individual stages in this directory:
-log_dir: ./tests/logs
-
+log_dir: ./tests/{{ logfile }}
